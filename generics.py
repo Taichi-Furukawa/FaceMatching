@@ -37,7 +37,7 @@ toolbox.register("individual", tools.initRepeat, creator.Individual,
 toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
 #@profile
-def evalOneMax(individual):
+def fitnessMax(individual):
 	#遺伝子をテンプレートマッチングの各パラメータにエンコード	
     t = int("".join(map(str,individual[0:4])),2)
     x = int("".join(map(str,individual[4:13])),2)
@@ -47,28 +47,21 @@ def evalOneMax(individual):
     trans_h = temp_h*k
     trans_w = temp_w*k
     #パラメータに従って適応度を算出
-    if (k!=0):        
-        #img_size = cv2.resize(temps[t],(trans_w,trans_h))
-        #img_size_mask = cv2.resize(mask,(trans_w,trans_h))
+    if (k!=0):        #k=0のときは画像サイズそのまま，k=1=0
         img_size = temps[t].resize((trans_w,trans_h))
         img_size_mask = mask.resize((trans_w,trans_h))
     else:
         img_size = temps[t]
         img_size_mask = mask
 
-    #M = cv2.getRotationMatrix2D((temp_w/2,temp_h/2),theta,1) #回転行列
-    #img_rotate = cv2.warpAffine(img_size,M,(temp_h*k.temp_w*k),flags=cv2.INTER_LINEAR,borderMode=cv2.BORDER_CONSTANT,borderValue=-1) #回転行列でアフィン変換
-
-    #img_pil = Image.fromarray(img_size)
-    #img_pil_mask = Image.fromarray(img_size_mask)
-    img_rotate = img_size.rotate(theta,expand=1)
+    img_rotate = img_size.rotate(theta,expand=1)#回転させる，expand=1=はみ出し部分の拡張
     img_rotate_mask = img_size_mask.rotate(theta,expand=1)
-    img_rotate = np.asarray(img_rotate)
+    img_rotate = np.asarray(img_rotate)#pil形式をopencv形式になおす
     img_rotate_mask = np.asarray(img_rotate_mask)
-    template_h,template_w = img_rotate.shape
+    template_h,template_w = img_rotate.shape#できあがったテンプレート画像のサイズを取得	
 
  
-    if y-template_h/2<0 or x-template_w/2<0:
+    if y-template_h/2<0 or x-template_w/2<0:#はみだしを考慮して原画像の一部を切り取る
         compare_img = base_img[0:template_h,0:template_w]
     elif x+template_w/2 > base_w:
         compare_img = base_img[y-template_h/2:(y-template_h/2)+template_h,x-template_w/2:(x-template_w/2)+(template_w-(x+template_w/2-base_w))]
@@ -79,15 +72,15 @@ def evalOneMax(individual):
     compare_h,compare_w = compare_img.shape
 
     diff = 0
-    for i in range(0,compare_h):
+    for i in range(0,compare_h):#差の和をだす
         for j in range(0,compare_w):
             if img_rotate_mask[i,j]==255:
                 diff+=compare_img[i,j]-img_rotate[i,j] if compare_img[i,j]>img_rotate[i,j] else img_rotate[i,j]-compare_img[i,j]
 
-    f = -1*diff/float(255*compare_h*compare_w)
+    f = -1*diff/float(255*compare_h*compare_w)#適応度f
     diff = 0
     #エッジ率の計算，ペナルティをかけるくだり
-    if y-template_h/2<0 or x-template_w/2<0:
+    if y-template_h/2<0 or x-template_w/2<0:#おなじようにはみだしを考慮してエッジ画像の一部を切り取る
         edge = edge_img[0:template_h,0:template_w]
     elif x+template_w/2 > base_w or y+template_h/2 > base_h:
         edge = edge_img[y-template_h/2:(y-template_h/2)+(template_h-(y+template_h/2-base_h)),x-template_w/2:(x-template_w/2)+(template_w-(x+template_w/2-base_w))]         
@@ -95,20 +88,20 @@ def evalOneMax(individual):
         edge = edge_img[y-template_h/2:(y-template_h/2)+template_h,x-template_w/2:(x-template_w/2)+template_w]         
 
     e_count = 0
-    if (k==0):
+    if (k==0):#エッジ成分の割合の閾値eiを算出する
         ei = 1.5
     else:
         ei = 1.5/k
-    for i in range(0,compare_h):
+    for i in range(0,compare_h):#白い部分＝エッジ部分の数を数える
         for j in range(0,compare_w):
             if (edge[i,j]==255):
                 e_count+=1
-    if (ei >= e_count/template_w*template_h):
+    if (ei >= e_count/template_w*template_h):#ペナルティをかける．この計算が合ってるかは疑問	
         f = f*3
     return f,
 
 # Operator registering
-toolbox.register("evaluate", evalOneMax)
+toolbox.register("evaluate", fitnessMax)
 toolbox.register("mate", tools.cxTwoPoint)
 toolbox.register("mutate", tools.mutFlipBit, indpb=0.05)
 toolbox.register("select", tools.selTournament, tournsize=2)
